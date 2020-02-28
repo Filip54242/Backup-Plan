@@ -8,9 +8,8 @@ from PIL import Image, ImageDraw
 from core.loss import JointsMSELoss
 from pose_hrnet import get_pose_net
 
+video_or_camera = 2
 
-#video_or_camera="id00027.mp4"
-video_or_camera=0
 dataset = "MPII"
 
 STICKS = {"MPII": [[0, 1], [1, 8], [8, 2], [2, 3], [3, 4], [8, 5], [5, 6], [6, 7], [8, 9], [9, 10], [10, 11], [11, 12],
@@ -22,13 +21,12 @@ IDS = {"MPII": {9: 0, 8: 1, 12: 2, 11: 3, 10: 4, 13: 5, 14: 6, 15: 7, 7: 8, 6: 9
        "COCO": {0: 0, 1: 1, 3: 2, 2: 3, 4: 4, 6: 5, 8: 6, 10: 7, 5: 8, 7: 9, 9: 10, 12: 11, 14: 12, 16: 13, 11: 14,
                 13: 15, 15: 16}}
 
-
 CFGS = {
     "MPII": {'OUTPUT_DIR': 'output', 'LOG_DIR': 'log', 'DATA_DIR': '', 'GPUS': (0), 'WORKERS': 24, 'PRINT_FREQ': 100,
              'AUTO_RESUME': True, 'PIN_MEMORY': True, 'RANK': 0,
              'CUDNN': {'BENCHMARK': True, 'DETERMINISTIC': False, 'ENABLED': True}, 'MODEL':
                  {'NAME': 'pose_hrnet', 'INIT_WEIGHTS': True,
-                  'PRETRAINED': '/home/filip/Documents/image_to_2D/pose_hrnet_w32_256x256.pth',
+                  'PRETRAINED': '/home/filip/Documents/Repos/Backup-Plan/pose_hrnet_w32_256x256.pth',
                   'NUM_JOINTS': 16, 'TAG_PER_JOINT': True, 'TARGET_TYPE': 'gaussian', 'IMAGE_SIZE': [256, 256],
                   'HEATMAP_SIZE': [64, 64], 'SIGMA': 2, 'EXTRA': {'PRETRAINED_LAYERS': ['conv1', 'bn1', 'conv2', 'bn2',
                                                                                         'layer1', 'transition1',
@@ -65,7 +63,7 @@ CFGS = {
                   'USE_GT_BBOX': False,
                   'IMAGE_THRE': 0.1, 'NMS_THRE': 0.6, 'SOFT_NMS': False, 'OKS_THRE': 0.5, 'IN_VIS_THRE': 0.0,
                   'COCO_BBOX_FILE': '', 'BBOX_THRE': 1.0,
-                  'MODEL_FILE': "/home/filip/Documents/image_to_2D/pose_hrnet_w32_256x256.pth"},
+                  'MODEL_FILE': "/home/filip/Documents/Repos/Backup-Plan/pose_hrnet_w32_256x256.pth"},
              'DEBUG':
                  {'DEBUG': True, 'SAVE_BATCH_IMAGES_GT': True, 'SAVE_BATCH_IMAGES_PRED': True, 'SAVE_HEATMAPS_GT': True,
                   'SAVE_HEATMAPS_PRED': True}},
@@ -115,13 +113,14 @@ CFGS = {
 }
 
 
-def output_valid(output, treshold=0.7):
+def output_valid(output, treshold=0.5):
     mean = 0
     for heatmap in output:
         mean += np.amax(heatmap)
     if mean / output.shape[0] > treshold:
         return True
     return False
+
 
 sticks = STICKS[dataset]
 ids = IDS[dataset]
@@ -131,11 +130,11 @@ cfg = CFGS[dataset]
 cudnn.benchmark = cfg['CUDNN']['BENCHMARK']
 torch.backends.cudnn.deterministic = cfg['CUDNN']['DETERMINISTIC']
 torch.backends.cudnn.enabled = cfg['CUDNN']['ENABLED']
-model = get_pose_net(cfg, is_train=False).cuda()
+model = get_pose_net(cfg, is_train=False).cpu()
 model.load_state_dict(torch.load(cfg['TEST']['MODEL_FILE']), strict=False)
 
 # define loss function (criterion) and optimizer
-criterion = JointsMSELoss(use_target_weight=cfg['LOSS']['USE_TARGET_WEIGHT']).cuda()
+criterion = JointsMSELoss(use_target_weight=cfg['LOSS']['USE_TARGET_WEIGHT']).cpu()
 
 test_transforms = transforms.Compose([
     transforms.Resize((256, 256)),
@@ -154,7 +153,7 @@ def max_index_matrix(matrix, coordinate):
 def result(input_image, output, radius=5):
     keypoint_locations = [None for index in range(len(output))]
     for index in range(len(output)):
-        heatmap = cv2.resize(output[index], dsize=(input_image. size), interpolation=cv2.INTER_CUBIC)
+        heatmap = cv2.resize(output[index], dsize=(input_image.size), interpolation=cv2.INTER_CUBIC)
         x = int(max_index_matrix(heatmap, 1))
         y = int(max_index_matrix(heatmap, 0))
         keypoint_locations[ids[index]] = (x, y)
@@ -173,14 +172,14 @@ while (True):
     input = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     input_copy = input.copy()
     input = test_transforms(input)
-    input = torch.unsqueeze(input, 0).cuda()
+    input = torch.unsqueeze(input, 0).cpu()
     with torch.no_grad():
         output = model(input).squeeze().detach().cpu().numpy()
     if output_valid(output):
-        image=cv2.cvtColor(np.asarray(result(input_copy, output)), cv2.COLOR_RGB2BGR)
+        image = cv2.cvtColor(np.asarray(result(input_copy, output)), cv2.COLOR_RGB2BGR)
     else:
-        image=cv2.cvtColor(np.asarray(input_copy), cv2.COLOR_RGB2BGR)
-    cv2.imshow(dataset + '_Demo', image )
+        image = cv2.cvtColor(np.asarray(input_copy), cv2.COLOR_RGB2BGR)
+    cv2.imshow(dataset + '_Demo', image)
 
     if cv2.waitKey(1) == 27:
         break

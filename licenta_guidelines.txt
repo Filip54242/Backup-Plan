@@ -1,0 +1,11 @@
+1.Introducere
+motivatie,state of the art, ce contine urmatoarele capitole
+2.Mashine learning
+3.Tehnologii folosite
+4.Descrierea aplicatiei
+Structura,cum functioneaza, scop, cum a fost antrenata,descriere arhitectura,descriere dataset, functia de loss,
+5.Concluzii 
+Bibleografie
+(identitatea vizuala a universitatii utsans  size 11)
+
+
